@@ -1,0 +1,92 @@
+name: Deploy Redirect to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create redirect page
+        run: |
+          mkdir -p gh-pages
+          cat > gh-pages/index.html << 'HTML'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta http-equiv="refresh" content="0; url=http://biotrainee.vip:15225/">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Redirecting to TCASIA</title>
+              <style>
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                      display: flex;
+                      justify-content: center;
+                      align-items: center;
+                      height: 100vh;
+                      margin: 0;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      color: white;
+                  }
+                  .container {
+                      text-align: center;
+                      padding: 2rem;
+                      background: rgba(255, 255, 255, 0.1);
+                      border-radius: 10px;
+                      backdrop-filter: blur(10px);
+                  }
+                  a {
+                      color: #fff;
+                      text-decoration: underline;
+                  }
+                  .spinner {
+                      border: 3px solid rgba(255, 255, 255, 0.3);
+                      border-top: 3px solid white;
+                      border-radius: 50%;
+                      width: 40px;
+                      height: 40px;
+                      animation: spin 1s linear infinite;
+                      margin: 20px auto;
+                  }
+                  @keyframes spin {
+                      0% { transform: rotate(0deg); }
+                      100% { transform: rotate(360deg); }
+                  }
+              </style>
+              <script>
+                  window.location.href = "http://biotrainee.vip:15225/";
+              </script>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>TCASIA Database</h1>
+                  <div class="spinner"></div>
+                  <p>Redirecting to <a href="http://biotrainee.vip:15225/">http://biotrainee.vip:15225/</a>...</p>
+                  <p style="font-size: 0.9em; margin-top: 20px;">If you are not redirected automatically, please click the link above.</p>
+              </div>
+          </body>
+          </html>
+          HTML
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'gh-pages'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
