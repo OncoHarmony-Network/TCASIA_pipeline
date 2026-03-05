@@ -1,0 +1,48 @@
+#
+# conda create -n spladder python=3.13
+# conda activate spladder
+# pip install spladder
+#
+# Run with snakemake -s snakefile_spladder --cores 15  --use-conda 
+# snakemake -s rules/snakefile_spladder --dag | dot -Tpdf > dag.pdf
+
+# Snakefile
+
+from collections import defaultdict
+import tempfile
+
+
+import os
+import glob
+workdir: config['workdir']
+
+raw_DIR = config["raw_DIR"]
+bam_DIR = config['bam_DIR']
+
+# 获取样本列表
+def get_samples():
+    return [os.path.splitext(os.path.basename(x))[0].split('_')[0] for x in glob.glob(f"{raw_DIR}/*_1.fastq.gz")]
+
+samples = get_samples()
+
+rule spladder:
+    input:
+        expand("AS_output/{sample}/spladder/", sample=samples),
+
+rule spladder_run:
+    input:
+        alt=bam_DIR + '/{sample}/{sample}_Aligned.sortedByCoord.out.bam',
+    output:
+        directory("AS_output/{sample}/spladder/"),
+    conda:
+        "spladder",
+    log:
+        "logs/spladder_run_{sample}.log",
+    params:
+        gtf=config["ref"],
+    shell:
+        "spladder build --bams {input.alt} "
+               "--annotation {params.gtf} "
+               "--outdir {output} "
+               "--parallel 10 "
+               "-v"

@@ -1,0 +1,41 @@
+# rmats需要确定样本的fastq的read (read_len) 数，一般来说，一个队列的read数是相同的，所以只需要确定一个样本就ok
+# 确定read数的方法是：
+# 运行 /data/home/zyh/project/AS-Pipeline/snakemake/call-workflow/scripts/read_length.sh
+# 查看 /data/home/zyh/project/AS_data/test/max_lengths.txt
+# 找到 maximum_length
+
+# If the read length is variable, use the maximum value
+read_len:
+  51
+
+raw_DIR:
+  /data/data2/IO_RNA/EGA_OAK/fq
+
+bam_DIR:
+  /data/data2/IO_RNA/AS/EGA_OAK/aligned
+
+workdir:
+  /data/data2/IO_RNA/AS/EGA_OAK
+
+MAJIQ_license:
+  /data/home/zyh/project/AS-Pipeline/snakemake/call-workflow/scripts/majiq_license_academic_official.lic
+
+suppa2_events:
+  /data/data2/reference/hg38_ek12/gencode.v34.events.ioe
+
+SALMON_INDEX:
+  /data/data2/reference/hg38_ek12/gencode.v34.transcripts.salmon.index
+  
+
+# In case of doubt, please RSeQC infer_experiment result
+strandness:
+  fr-firststrand
+
+# full path to the reference transcriptome model
+ref:
+  /data/data2/reference/hg38_ek12/gencode.v34.annotation.gtf
+# full path to the reference sequence
+ref_fa:
+  /data/data2/reference/hg38_ek12/GRCh38.primary_assembly.genome.fa
+GFF:
+  /data/data2/reference/hg38_ek12/gencode.v34.annotation.gff3

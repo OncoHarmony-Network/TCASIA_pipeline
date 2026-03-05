@@ -1,0 +1,75 @@
+# Snakefile v.0.1
+# ssh node3
+# micromamba create -c conda-forge -c bioconda -n snakemake snakemake
+# cd /data/home/zyh/project/AS-Pipeline/snakemake/call-workflow/
+# micromamba activate snakemake
+# 在config文件中确定read length
+# snakemake -s Snakefile --dag | dot -Tpdf > dag.pdf
+# export TMPDIR=/data/home/zyh/tmp
+# 重新运行suppa2
+# find /data/data2/IO_RNA/AS/EGA_OAK/AS_output -type f -name '*_event.psi'
+# find /data/data2/IO_RNA/AS/EGA_OAK/AS_output -type f -name '*_event.psi' -delete
+# 先运行这一段更新时间戳: nohup snakemake -s Snakefile --cores 100 --use-conda --rerun-incomplete --touch --retries 3 >EGA_OAK.log 2>&1 &
+# Run with: nohup snakemake -s Snakefile --cores 40 --use-conda --rerun-incomplete --retries 3 --keep-going > EGA_OAK.log 2>&1 &
+# save pid: echo $! > run.EGA_OAK.pid
+
+
+# Snakefile
+
+from snakemake.utils import min_version
+
+##### set minimum snakemake version #####
+min_version("7.0.0")
+
+
+##### setup report #####
+configfile: "config/config.yml"
+
+
+report: "logs/workflow.rst"
+
+
+##### load rules #####
+import os
+import glob
+
+include: "rules/snakefile_majiq"
+include: "rules/snakefile_rmats"
+include: "rules/snakefile_suppa2"
+include: "rules/snakefile_spladder"
+
+# 获取样本列表
+raw_DIR = config["raw_DIR"]
+workdir: config['workdir']
+
+def get_samples():
+    return [os.path.splitext(os.path.basename(x))[0].rsplit('_', 1)[0] for x in glob.glob(f"{raw_DIR}/*_1.fastq.gz")]
+
+samples = get_samples()
+
+
+##### target rules #####
+
+def get_final_output():
+    final_output = expand(
+        "AS_output/{sample}/majiq/{sample}.voila.tsv", 
+        sample=samples
+    ) + expand(
+        "AS_output/{sample}/majiq/modulized/", 
+        sample=samples
+    ) + expand(
+        "AS_output/{sample}/rmats/", 
+        sample=samples
+    ) + expand(
+        "AS_output/{sample}/suppa2/{sample}_event.psi",
+        sample=samples
+    ) + expand(
+        "AS_output/{sample}/spladder/",
+        sample=samples
+    )
+    return final_output
+
+
+rule all:
+    input:
+        get_final_output(),

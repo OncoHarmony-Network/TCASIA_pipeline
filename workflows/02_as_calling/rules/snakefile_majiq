@@ -1,0 +1,145 @@
+#
+# micromamba create -n MAJIQ -c bioconda -c conda-forge python=3.10
+# micromamba activate MAJIQ
+# export HTSLIB_INCLUDE_DIR=/data/home/zyh/micromamba/envs/MAJIQ/include
+# export HTSLIB_LIBRARY_DIR=/data/home/zyh/micromamba/envs/MAJIQ/lib
+# pip install git+https://bitbucket.org/biociphers/majiq_academic.git
+# micromamba install htslib
+# 
+# Run with snakemake -s rules/snakefile_majiq --cores 15  --use-conda 
+# snakemake -s rules/snakefile_majiq --dag | dot -Tpdf > dag.pdf
+
+# Snakefile
+
+import os
+import glob
+
+workdir: config['workdir']
+
+# 获取样本列表
+raw_DIR = config["raw_DIR"]
+
+def get_samples():
+    return [os.path.splitext(os.path.basename(x))[0].rsplit('_', 1)[0] for x in glob.glob(f"{raw_DIR}/*_1.fastq.gz")]
+
+# 定义样本
+samples = get_samples()
+
+# 定义通用变量
+GENOME_FA = config["ref_fa"]
+
+
+def create_ini(output, sample, bam_dir, read_len):
+    output_dir = os.path.dirname(output)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    genome = f"{GENOME_FA}"
+    strandness = "None"
+    bamfile = f"{sample}_Aligned.sortedByCoord.out"
+
+    lines = [
+        "[info]",
+        f"readlen={read_len}",
+        f"bamdirs={bam_dir}/{sample}",
+        f"genome={genome}",
+        f"strandness={strandness}",
+        "[experiments]",
+        f"tumor={bamfile}"
+    ]
+    
+    with open(output, "w") as ini_file:
+        ini_file.write("\n".join(lines))
+
+
+
+
+rule majiq:
+    input:
+        expand("AS_output/{sample}/majiq/{sample}.voila.tsv", sample=samples),
+        expand("AS_output/{sample}/majiq/modulized/", sample=samples)
+
+# 创建MAJIQ配置文件
+rule majiq_create_ini:
+    input:
+        config['bam_DIR'] + "/{sample}/{sample}_Aligned.sortedByCoord.out.bam"
+    output:
+        "majiq/{sample}/build.ini",
+    log:
+        "logs/majiq_create_ini_{sample}.log", 
+    params:
+        read_len=config["read_len"]
+    run:
+        for sample in samples:
+            output_path = f"majiq/{sample}/build.ini"
+            create_ini(output_path, sample, config['bam_DIR'], params.read_len)
+
+
+# MAJIQ构建splice graph
+rule majiq_build:
+    input:
+        config="majiq/{sample}/build.ini",
+    output:
+        "AS_output/{sample}/majiq/{sample}_Aligned.sortedByCoord.out.majiq",
+        "AS_output/{sample}/majiq/{sample}_Aligned.sortedByCoord.out.sj",
+        "AS_output/{sample}/majiq/splicegraph.sql",
+    log:"logs/{sample}_majiq_build.log"
+    params:
+        build="AS_output/{sample}/majiq/",
+        GFF=config["GFF"],
+        LICENSE=config["MAJIQ_license"]
+    conda: "MAJIQ"
+    shell:
+        """
+        majiq --license {params.LICENSE} build {params.GFF} -c {input.config} -j 30 -o {params.build} --minreads 10
+        """
+
+# MAJIQ quantification
+rule majiq_psi:
+    input:
+        build_done="AS_output/{sample}/majiq/{sample}_Aligned.sortedByCoord.out.majiq"
+    output:
+        psi="AS_output/{sample}/majiq/{sample}.psi.tsv",
+        voila="AS_output/{sample}/majiq/{sample}.psi.voila"
+    log:"logs/{sample}_majiq_psi.log"
+    conda: "MAJIQ"
+    params:
+        LICENSE=config["MAJIQ_license"],
+        psi="AS_output/{sample}/majiq"
+    shell:
+        """
+        majiq --license {params.LICENSE} psi {input.build_done} -n {wildcards.sample} -o {params.psi}
+        """
+
+# Voila modularization
+rule Voila_modulize:
+    input:
+        sql="AS_output/{sample}/majiq/splicegraph.sql",
+        voila="AS_output/{sample}/majiq/{sample}.psi.voila"
+    output:
+        directory("AS_output/{sample}/majiq/modulized/")
+    log:"logs/{sample}_Voila_modulize.log"
+    conda: "MAJIQ"
+    params:
+        LICENSE=config["MAJIQ_license"],
+        psi="AS_output/{sample}/majiq"
+    shell:
+        """
+        voila --license {params.LICENSE} modulize -d {output} {input.sql} {input.voila} -j8
+        """
+
+
+rule Voila_tsv:
+    input:
+        sql="AS_output/{sample}/majiq/splicegraph.sql",
+        voila="AS_output/{sample}/majiq/{sample}.psi.voila"
+    output:
+        Voila_tsv_result="AS_output/{sample}/majiq/{sample}.voila.tsv"
+    log:"logs/{sample}_Voila_tsv.log"
+    conda: "MAJIQ"
+    params:
+        LICENSE=config["MAJIQ_license"],
+        psi="AS_output/{sample}/majiq"
+    shell:
+        """
+        voila --license {params.LICENSE} tsv -f {output} {input.sql} {input.voila} -j8
+        """

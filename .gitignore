@@ -1,0 +1,96 @@
+# Environment variables
+.env
+*.env
+!.env.example
+
+# MAJIQ license (sensitive)
+**/majiq_license*.lic
+
+# Snakemake
+.snakemake/
+*.snakemake.log
+
+# Conda environments
+.conda/
+envs/*/
+
+# Data files (too large for git)
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz
+*.bam
+*.bai
+*.sam
+*.cram
+
+# Reference files (too large)
+*.fa
+*.fasta
+*.fa.gz
+*.fasta.gz
+*.gtf
+*.gtf.gz
+*.gff
+*.gff.gz
+*.gff3
+*.gff3.gz
+
+# Index files
+STAR_index/
+*.salmon.index/
+*.bt2
+*.ebwt
+
+# Output files
+results/
+logs/
+benchmarks/
+*.log
+*.out
+*.err
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# R
+.Rhistory
+.RData
+.Rproj.user
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Compressed files
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+
+# User-specific config files (keep templates only)
+config/my_*.yml
+config/my_*.yaml
+!config/config.yml
+!config/config.template.yml

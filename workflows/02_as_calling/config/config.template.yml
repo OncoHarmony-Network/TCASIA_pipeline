@@ -1,0 +1,107 @@
+# Configuration Template for AS Calling Workflow
+# Copy this file and modify paths for your project
+
+# ============================================================================
+# SEQUENCING PARAMETERS
+# ============================================================================
+
+# Maximum read length (REQUIRED for rMATS)
+# If variable, use maximum value
+# Check with: bash scripts/read_length.sh /path/to/sample.bam
+read_len: 150
+
+# ============================================================================
+# DIRECTORY PATHS
+# ============================================================================
+
+# Directory containing input FASTQ files (for SUPPA2 Salmon quantification)
+# Expected naming: {sample}_1.fastq.gz and {sample}_2.fastq.gz
+raw_DIR: /path/to/your/fastq
+
+# Directory containing aligned BAM files from workflow 01_alignment
+# Expected: {bam_DIR}/{sample}/{sample}_Aligned.sortedByCoord.out.bam
+bam_DIR: /path/to/your/aligned
+
+# Working directory for AS outputs
+workdir: /path/to/your/AS_output
+
+# ============================================================================
+# REFERENCE FILES
+# ============================================================================
+
+# GTF annotation file (GENCODE v34 recommended)
+ref: /path/to/gencode.v34.annotation.gtf
+
+# GFF3 annotation file (REQUIRED for MAJIQ)
+GFF: /path/to/gencode.v34.annotation.gff3
+
+# Reference genome FASTA file (GRCh38 recommended)
+ref_fa: /path/to/GRCh38.primary_assembly.genome.fa
+
+# ============================================================================
+# TOOL-SPECIFIC FILES
+# ============================================================================
+
+# MAJIQ academic license file (REQUIRED)
+# Obtain from: https://majiq.biociphers.org/
+MAJIQ_license: /path/to/majiq_license_academic_official.lic
+
+# SUPPA2 pre-generated events file (REQUIRED)
+# Generate with: suppa.py generateEvents -i annotation.gtf -o events -f ioe -e SE SS MX RI FL
+suppa2_events: /path/to/gencode.v34.events.ioe
+
+# Salmon index for transcript quantification (REQUIRED for SUPPA2)
+# Build with: salmon index -t transcripts.fa -i index -k 31
+SALMON_INDEX: /path/to/gencode.v34.transcripts.salmon.index
+
+# ============================================================================
+# LIBRARY PARAMETERS
+# ============================================================================
+
+# Library strandness (IMPORTANT: must match your library prep)
+# Options:
+#   - fr-firststrand: dUTP/NSR/NNSR (most common)
+#   - fr-secondstrand: Ligation-based
+#   - fr-unstranded: Unstranded
+strandness: fr-firststrand
+
+# ============================================================================
+# OPTIONAL PARAMETERS (Advanced)
+# ============================================================================
+
+# rMATS parameters (uncomment to override defaults)
+# rmats_allow_clipping: --allow-clipping
+# rmats_variable_read_length: --variable-read-length
+# rmats_novel_ss: --novelSS
+# rmats_extra: ""
+
+# ============================================================================
+# NOTES
+# ============================================================================
+
+# 1. All paths must be absolute (not relative)
+# 2. BAM files must be coordinate-sorted and indexed
+# 3. MAJIQ license is required (free for academic use)
+# 4. SUPPA2 events file must match your GTF annotation
+# 5. Salmon index must be built with the same version (1.10.3 recommended)
+# 6. For read_len, run: bash scripts/read_length.sh /path/to/sample.bam
+# 7. Ensure sufficient disk space (set TMPDIR for rMATS if needed)
+
+# ============================================================================
+# QUICK START
+# ============================================================================
+
+# 1. Copy this template:
+#    cp config.template.yml config/my_project.yml
+
+# 2. Edit paths in my_project.yml
+
+# 3. Check read length:
+#    bash scripts/read_length.sh {bam_DIR}/{sample}/{sample}_Aligned.sortedByCoord.out.bam
+
+# 4. Dry run:
+#    snakemake -s Snakefile --configfile config/my_project.yml --dry-run
+
+# 5. Run workflow:
+#    export TMPDIR=/path/to/large/tmp
+#    snakemake -s Snakefile --configfile config/my_project.yml --cores 40 --use-conda

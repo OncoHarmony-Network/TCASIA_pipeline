@@ -1,0 +1,92 @@
+#
+# micromamba create -n SUPPA2 -c bioconda -c conda-forge python=3.8 salmon
+# micromamba activate SUPPA2
+# micromamba install  -y -c bioconda suppa
+# Run with snakemake -s rules/snakefile_suppa2 --cores 15  --use-conda --dryrun
+# snakemake -s snakefile_suppa2 --dag | dot -Tpdf > dag.pdf
+
+# Snakefile
+
+
+from collections import defaultdict
+import tempfile
+
+
+import os
+import glob
+
+raw_DIR = config["raw_DIR"]
+workdir: config['workdir']
+
+# 获取样本列表
+def get_samples():
+    return [os.path.splitext(os.path.basename(x))[0].split('_')[0] for x in glob.glob(f"{raw_DIR}/*_1.fastq.gz")]
+
+samples = get_samples()
+
+# 将sample写进txt文件，把txt存储在队列文件夹里面
+
+
+rule suppa2:
+    input:
+        expand("AS_output/{sample}/suppa2/{sample}_event.psi", sample=samples)
+
+rule salmon_quant:
+    input:
+        fq1 = raw_DIR + "/{sample}_1.fastq.gz",
+        fq2 = raw_DIR + "/{sample}_2.fastq.gz"
+    output:
+        quant_file = "suppa2/{sample}/quant.sf"
+    threads: 15
+    conda: "SUPPA2"
+    log:
+        "logs/suppa_salmon_quant_run_{sample}.log"
+    params:
+        SALMON_INDEX=config["SALMON_INDEX"],
+        quant="suppa2/{sample}"
+    shell:
+        """
+        salmon quant -i {params.SALMON_INDEX} -l ISF --gcBias -1 {input.fq1} -2 {input.fq2} -p {threads} -o {params.quant}
+        """
+rule select_fields:
+    input:
+        quant_file = "suppa2/{sample}/quant.sf"
+    output:
+        iso_tpm = "suppa2/{sample}/iso_tpm.txt"
+    log:
+        "logs/suppa_select_fields_run_{sample}.log"
+    conda: "SUPPA2"
+    shell:
+        "multipleFieldSelection.py -i {input.quant_file} -k 1 -f 4 -o {output.iso_tpm}"
+
+rule format_fields:
+    input:
+        iso_tpm ="suppa2/{sample}/iso_tpm.txt"
+    output:
+        formatted = "suppa2/{sample}/iso_tpm_formatted.txt"
+    log:
+        "logs/suppa_format_fields_run_{sample}.log"
+    conda: "SUPPA2"
+    shell:
+        # "perl -alne '{{/(\|.*\|)\t/; s/$1//g; s/\|//g; print}}' {input.iso_tpm} > {output.formatted}"
+        "perl -alne '{{/(\\|.*\\|)\t/; s/$1//g; s/\\|//g; print}}' {input.iso_tpm} > {output.formatted}"
+
+
+
+
+rule suppa_run:
+    input:
+        iso_tpm ="suppa2/{sample}/iso_tpm_formatted.txt"
+    output:
+        result="AS_output/{sample}/suppa2/{sample}_event.psi"
+    log:
+        "logs/suppa_run_{sample}.log",
+    conda: "SUPPA2"
+    params:
+        gtf=config["suppa2_events"],
+        event = "AS_output/{sample}/suppa2/{sample}_event"
+    shell:
+        "suppa.py psiPerEvent -i {params.gtf} -f 1 -e {input.iso_tpm} -o {params.event}"
+
+
+

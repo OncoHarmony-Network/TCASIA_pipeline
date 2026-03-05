@@ -1,0 +1,66 @@
+# Configuration Template for RNA-seq Alignment Workflow
+# Copy this file and modify paths for your project
+
+# ============================================================================
+# PROJECT INFORMATION
+# ============================================================================
+
+# Cohort name (used for organizing outputs)
+cohort: YOUR_COHORT_NAME
+
+# ============================================================================
+# DIRECTORY PATHS
+# ============================================================================
+
+# Root directory for all data
+root_DIR: /path/to/your/data
+
+# Directory containing input FASTQ files
+# Expected naming: {sample}_1.fastq.gz and {sample}_2.fastq.gz
+raw_DIR: /path/to/your/fastq
+
+# Output directory for aligned BAM files
+bam_DIR: /path/to/your/output/aligned
+
+# Working directory for intermediate files
+workdir: /path/to/your/output
+
+# ============================================================================
+# REFERENCE FILES
+# ============================================================================
+
+# STAR genome index directory
+# Build with: STAR --runMode genomeGenerate ...
+star_index_DIR: /path/to/STAR_index
+
+# GTF annotation file (GENCODE v34 recommended)
+ref: /path/to/gencode.v34.annotation.gtf
+
+# Reference genome FASTA file (GRCh38 recommended)
+ref_fa: /path/to/GRCh38.primary_assembly.genome.fa
+
+# ============================================================================
+# SEQUENCING PARAMETERS
+# ============================================================================
+
+# Library strandness (IMPORTANT: check your library prep protocol)
+# Options:
+#   - fr-firststrand: dUTP/NSR/NNSR methods (most common for Illumina TruSeq)
+#   - fr-secondstrand: Ligation-based methods
+#   - fr-unstranded: Unstranded libraries
+strandness: fr-firststrand
+
+# Maximum read length in your data
+# If variable read length, use the maximum value
+# Check with: samtools stats your.bam | grep "maximum length"
+read_len: 150
+
+# ============================================================================
+# NOTES
+# ============================================================================
+
+# 1. Ensure all paths are absolute (not relative)
+# 2. FASTQ files must be gzipped and follow naming convention
+# 3. STAR index must match the STAR version used (2.7.7a recommended)
+# 4. For strandness, use RSeQC infer_experiment.py if unsure
+# 5. Read length: use maximum if variable (e.g., 150 for 100-150bp reads)

@@ -1,0 +1,30 @@
+cohort:
+  PRJNA498500 
+
+root_DIR:
+  /data/data2/IO_RNA
+
+raw_DIR:
+  /data/data2/IO_RNA/PRJNA498500/fq
+
+bam_DIR:
+  /data/data2/IO_RNA/AS/PRJNA498500/aligned
+
+workdir:
+  /data/data2/IO_RNA/AS/PRJNA498500
+  
+star_index_DIR:
+  /data/data2/reference/hg38_ek12/STAR_index_star_2.7.7a
+
+# In case of doubt, please RSeQC infer_experiment result
+strandness:
+  fr-firststrand
+# If the read length is variable, use the maximum value
+read_len:
+  50
+# full path to the reference transcriptome model
+ref:
+  /data/data2/reference/hg38_ek12/gencode.v34.annotation.gtf
+# full path to the reference sequence
+ref_fa:
+  /data/data2/reference/hg38_ek12/GRCh38.primary_assembly.genome.fa
