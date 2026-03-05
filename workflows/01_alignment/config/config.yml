@@ -28,3 +28,10 @@ ref:
 # full path to the reference sequence
 ref_fa:
   /data/data2/reference/hg38_ek12/GRCh38.primary_assembly.genome.fa
+
+# fastp QC parameters
+fastp_threads: 8
+fastp_min_length: 36
+fastp_phred: 20
+fastp_unqualified_percent_limit: 40
+fastp_n_base_limit: 5

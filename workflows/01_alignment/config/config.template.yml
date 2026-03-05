@@ -56,6 +56,25 @@ strandness: fr-firststrand
 read_len: 150
 
 # ============================================================================
+# FASTP QC PARAMETERS
+# ============================================================================
+
+# Number of threads for fastp
+fastp_threads: 8
+
+# Minimum read length after trimming (reads shorter than this are discarded)
+fastp_min_length: 36
+
+# Minimum base quality score (bases below this threshold are considered low quality)
+fastp_phred: 20
+
+# Maximum percentage of low-quality bases allowed per read (0-100)
+fastp_unqualified_percent_limit: 40
+
+# Maximum number of N bases allowed per read
+fastp_n_base_limit: 5
+
+# ============================================================================
 # NOTES
 # ============================================================================
 

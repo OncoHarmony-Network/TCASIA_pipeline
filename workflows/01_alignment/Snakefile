@@ -14,6 +14,8 @@ configfile: "config/config.yml"
 cohort = config["cohort"]
 root_DIR = config["root_DIR"]
 bam_DIR = root_DIR+"/AS/"+cohort+"/aligned"
+clean_DIR = root_DIR+"/"+cohort+"/fq_clean"
+qc_DIR = root_DIR+"/"+cohort+"/qc"
 
 import os
 import glob
@@ -30,12 +32,50 @@ samples = get_samples()
 rule all:
     input:
         expand(bam_DIR+"/{sample}/{sample}_Aligned.sortedByCoord.out.bam.bai", sample=samples),
-        expand(bam_DIR+"/{sample}/{sample}_counts.id.txt", sample=samples)
+        expand(bam_DIR+"/{sample}/{sample}_counts.id.txt", sample=samples),
+        expand(qc_DIR+"/{sample}_fastp.html", sample=samples)
 
-rule star_align:
+rule fastp_qc:
     input:
         fq1=root_DIR+"/"+cohort+"/fq/{sample}_1.fastq.gz",
         fq2=root_DIR+"/"+cohort+"/fq/{sample}_2.fastq.gz"
+    output:
+        fq1=clean_DIR+"/{sample}_1.clean.fastq.gz",
+        fq2=clean_DIR+"/{sample}_2.clean.fastq.gz",
+        html=qc_DIR+"/{sample}_fastp.html",
+        json=qc_DIR+"/{sample}_fastp.json"
+    params:
+        threads=config["fastp_threads"],
+        min_length=config["fastp_min_length"],
+        phred=config["fastp_phred"],
+        unqualified_percent=config["fastp_unqualified_percent_limit"],
+        n_base_limit=config["fastp_n_base_limit"],
+        clean_dir=clean_DIR,
+        qc_dir=qc_DIR
+    log:
+        "logs/{sample}_fastp.log"
+    conda: "fastp"
+    shell:
+        """
+        mkdir -p {params.clean_dir} {params.qc_dir}
+        fastp \
+            -i {input.fq1} -I {input.fq2} \
+            -o {output.fq1} -O {output.fq2} \
+            --html {output.html} \
+            --json {output.json} \
+            --length_required {params.min_length} \
+            --qualified_quality_phred {params.phred} \
+            --unqualified_percent_limit {params.unqualified_percent} \
+            --n_base_limit {params.n_base_limit} \
+            --thread {params.threads} \
+            --detect_adapter_for_pe \
+        > {log} 2>&1
+        """
+
+rule star_align:
+    input:
+        fq1=clean_DIR+"/{sample}_1.clean.fastq.gz",
+        fq2=clean_DIR+"/{sample}_2.clean.fastq.gz"
     output:
         bam=bam_DIR+"/{sample}/{sample}_Aligned.out.bam"
     params:
