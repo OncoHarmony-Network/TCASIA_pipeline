@@ -1,0 +1,12 @@
+samples: tests/fixtures/samples.tsv
+output_dir: tests/output/alignment
+star_index_DIR: tests/fixtures/reference/star_index
+ref: tests/fixtures/reference/annotation.gtf.txt
+strandness: fr-firststrand
+
+threads:
+  fastp: 1
+  star: 1
+  samtools_sort: 1
+  samtools_index: 1
+  featurecounts: 1

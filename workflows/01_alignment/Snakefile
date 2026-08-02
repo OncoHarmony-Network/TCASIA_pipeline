@@ -1,168 +1,163 @@
-# Snakefile v.0.1
-# ssh node3
-# cd /data/home/zyh/project/AS-Pipeline/snakemake/align-workflow
-# micromamba activate snakemake
-# snakemake -s Snakefile --dag | dot -Tpdf > dag.pdf
-# 先运行这一段更新时间戳: nohup snakemake -s Snakefile --cores 10 --use-conda --rerun-incomplete --touch --retries 3 >PRJNA498500.log 2>&1 &
-# Run with: nohup snakemake -s Snakefile --cores 10 --use-conda --rerun-incomplete --retries 3  --keep-going >PRJNA498500.log 2>&1 &
-# save pid: echo $! > run.PRJNA498500.pid
+# RNA-seq quality-control and alignment workflow for TCASIA.
 
+from pathlib import Path
+import sys
 
+from snakemake.utils import min_version
 
-
+min_version("7.0.0")
 configfile: "config/config.yml"
-cohort = config["cohort"]
-root_DIR = config["root_DIR"]
-bam_DIR = root_DIR+"/AS/"+cohort+"/aligned"
-clean_DIR = root_DIR+"/"+cohort+"/fq_clean"
-qc_DIR = root_DIR+"/"+cohort+"/qc"
 
-import os
-import glob
+LIB_DIR = Path(workflow.basedir).resolve().parent / "lib"
+sys.path.insert(0, str(LIB_DIR))
+from tcasia_config import load_samples, normalize_strandness, require_config
 
-# 获取样本列表
-def get_samples():
-    return [os.path.splitext(os.path.basename(x))[0].rsplit('_',1)[0] for x in glob.glob(f"{root_DIR}/{cohort}/fq/*_1.fastq.gz")]
+require_config(config, "samples", "output_dir", "star_index_DIR", "ref", "strandness")
+SAMPLE_TABLE = load_samples(config["samples"])
+SAMPLES = list(SAMPLE_TABLE)
+STRANDNESS = normalize_strandness(config["strandness"])
 
-# 定义样本
-samples = get_samples()
+OUTPUT_DIR = Path(config["output_dir"]).expanduser().resolve()
+CLEAN_DIR = OUTPUT_DIR / "clean_fastq"
+QC_DIR = OUTPUT_DIR / "qc"
+ALIGN_DIR = OUTPUT_DIR / "aligned"
+LOG_DIR = OUTPUT_DIR / "logs"
 
+THREADS = config.get("threads", {})
+FASTP = config.get("fastp", {})
+STAR = config.get("star", {})
 
 
 rule all:
     input:
-        expand(bam_DIR+"/{sample}/{sample}_Aligned.sortedByCoord.out.bam.bai", sample=samples),
-        expand(bam_DIR+"/{sample}/{sample}_counts.id.txt", sample=samples),
-        expand(qc_DIR+"/{sample}_fastp.html", sample=samples)
+        expand(str(ALIGN_DIR / "{sample}" / "{sample}_Aligned.sortedByCoord.out.bam.bai"), sample=SAMPLES),
+        expand(str(ALIGN_DIR / "{sample}" / "{sample}_featureCounts.txt"), sample=SAMPLES),
+        expand(str(QC_DIR / "{sample}_fastp.html"), sample=SAMPLES),
+
 
 rule fastp_qc:
     input:
-        fq1=root_DIR+"/"+cohort+"/fq/{sample}_1.fastq.gz",
-        fq2=root_DIR+"/"+cohort+"/fq/{sample}_2.fastq.gz"
+        fq1=lambda wildcards: SAMPLE_TABLE[wildcards.sample]["fastq_1"],
+        fq2=lambda wildcards: SAMPLE_TABLE[wildcards.sample]["fastq_2"],
     output:
-        fq1=clean_DIR+"/{sample}_1.clean.fastq.gz",
-        fq2=clean_DIR+"/{sample}_2.clean.fastq.gz",
-        html=qc_DIR+"/{sample}_fastp.html",
-        json=qc_DIR+"/{sample}_fastp.json"
+        fq1=str(CLEAN_DIR / "{sample}_1.clean.fastq.gz"),
+        fq2=str(CLEAN_DIR / "{sample}_2.clean.fastq.gz"),
+        html=str(QC_DIR / "{sample}_fastp.html"),
+        json=str(QC_DIR / "{sample}_fastp.json"),
+    threads: int(THREADS.get("fastp", 8))
     params:
-        threads=config["fastp_threads"],
-        min_length=config["fastp_min_length"],
-        phred=config["fastp_phred"],
-        unqualified_percent=config["fastp_unqualified_percent_limit"],
-        n_base_limit=config["fastp_n_base_limit"],
-        clean_dir=clean_DIR,
-        qc_dir=qc_DIR
+        min_length=int(FASTP.get("min_length", 36)),
+        phred=int(FASTP.get("qualified_quality_phred", 20)),
+        unqualified_percent=int(FASTP.get("unqualified_percent_limit", 40)),
+        n_base_limit=int(FASTP.get("n_base_limit", 5)),
     log:
-        "logs/{sample}_fastp.log"
-    conda: "fastp"
+        str(LOG_DIR / "fastp" / "{sample}.log"),
+    conda:
+        "envs/fastp.yaml"
     shell:
         """
-        mkdir -p {params.clean_dir} {params.qc_dir}
+        mkdir -p "$(dirname {output.fq1:q})" "$(dirname {output.html:q})" "$(dirname {log:q})"
         fastp \
-            -i {input.fq1} -I {input.fq2} \
-            -o {output.fq1} -O {output.fq2} \
-            --html {output.html} \
-            --json {output.json} \
+            -i {input.fq1:q} -I {input.fq2:q} \
+            -o {output.fq1:q} -O {output.fq2:q} \
+            --html {output.html:q} --json {output.json:q} \
             --length_required {params.min_length} \
             --qualified_quality_phred {params.phred} \
             --unqualified_percent_limit {params.unqualified_percent} \
             --n_base_limit {params.n_base_limit} \
-            --thread {params.threads} \
-            --detect_adapter_for_pe \
-        > {log} 2>&1
+            --thread {threads} --detect_adapter_for_pe \
+            > {log:q} 2>&1
         """
+
 
 rule star_align:
     input:
-        fq1=clean_DIR+"/{sample}_1.clean.fastq.gz",
-        fq2=clean_DIR+"/{sample}_2.clean.fastq.gz"
+        fq1=str(CLEAN_DIR / "{sample}_1.clean.fastq.gz"),
+        fq2=str(CLEAN_DIR / "{sample}_2.clean.fastq.gz"),
     output:
-        bam=bam_DIR+"/{sample}/{sample}_Aligned.out.bam"
+        bam=str(ALIGN_DIR / "{sample}" / "{sample}_Aligned.out.bam"),
+    threads: int(THREADS.get("star", 10))
     params:
-        prefix=bam_DIR+"/{sample}/{sample}_",
-        root_DIR = config["root_DIR"],
-        cohort=config["cohort"],
-        genomeDir=config["star_index_DIR"]  # 可根据需要添加其他STAR参数
+        prefix=lambda wildcards: str(ALIGN_DIR / wildcards.sample / f"{wildcards.sample}_"),
+        genome_dir=config["star_index_DIR"],
+        mismatch_max=int(STAR.get("out_filter_mismatch_nmax", 15)),
+        bam_sort_ram=int(STAR.get("limit_bam_sort_ram", 39050942993)),
     log:
-        "logs/{sample}_star.log"
-    conda: "ega"
+        str(LOG_DIR / "star" / "{sample}.log"),
+    conda:
+        "envs/ega.yaml"
     shell:
         """
-        mkdir -p {params.root_DIR}/AS/{params.cohort}/aligned/{wildcards.sample}
-        STAR --runThreadN 10 \
-             --genomeDir {params.genomeDir} \
-             --readFilesIn {input.fq1} {input.fq2} \
-             --outFileNamePrefix {params.prefix} \
+        mkdir -p "$(dirname {output.bam:q})" "$(dirname {log:q})"
+        STAR --runThreadN {threads} \
+             --genomeDir {params.genome_dir:q} \
+             --readFilesIn {input.fq1:q} {input.fq2:q} \
+             --outFileNamePrefix {params.prefix:q} \
              --outSAMunmapped Within \
              --readFilesCommand zcat \
-             --outFilterMismatchNmax 15 \
+             --outFilterMismatchNmax {params.mismatch_max} \
              --outSAMattributes All \
              --outStd Log \
-             --limitBAMsortRAM 39050942993 \
+             --limitBAMsortRAM {params.bam_sort_ram} \
              --outSAMtype BAM Unsorted \
              --outFilterIntronMotifs RemoveNoncanonical \
              --outSAMstrandField intronMotif \
              --twopassMode Basic \
              --quantMode GeneCounts \
-        > {log} 2>&1
+             > {log:q} 2>&1
         """
+
 
 rule sort_bam:
     input:
-        bam=bam_DIR+"/{sample}/{sample}_Aligned.out.bam"
-    params:
-        cohort=config["cohort"],
-        root_DIR = config["root_DIR"]
+        bam=str(ALIGN_DIR / "{sample}" / "{sample}_Aligned.out.bam"),
     output:
-        sort_bam=bam_DIR+"/{sample}/{sample}_Aligned.sortedByCoord.out.bam"
-    conda: "samtools1"
+        bam=str(ALIGN_DIR / "{sample}" / "{sample}_Aligned.sortedByCoord.out.bam"),
+    threads: int(THREADS.get("samtools_sort", 8))
+    log:
+        str(LOG_DIR / "samtools" / "{sample}.sort.log"),
+    conda:
+        "envs/samtools1.yaml"
     shell:
-        "samtools sort {input.bam} -@ 30 -o {output.sort_bam}"
+        """
+        mkdir -p "$(dirname {log:q})"
+        samtools sort -@ {threads} -o {output.bam:q} {input.bam:q} > {log:q} 2>&1
+        """
+
 
 rule index_bam:
     input:
-        sort_bam=bam_DIR+"/{sample}/{sample}_Aligned.sortedByCoord.out.bam"
+        bam=str(ALIGN_DIR / "{sample}" / "{sample}_Aligned.sortedByCoord.out.bam"),
     output:
-        bai=bam_DIR+"/{sample}/{sample}_Aligned.sortedByCoord.out.bam.bai"
-    conda:"samtools1"
-    params:
-        cohort=config["cohort"],
-        root_DIR = config["root_DIR"]
-    shell:
-        "samtools index {input.sort_bam} {output.bai}"
-
-rule featureCounts:
-    input:
-        sort_bam=bam_DIR+"/{sample}/{sample}_Aligned.sortedByCoord.out.bam"
-    output:
-        counts=bam_DIR+"/{sample}/{sample}_counts.txt"
-    conda:"subread"
-    params:
-        ref=config["ref"],
+        bai=str(ALIGN_DIR / "{sample}" / "{sample}_Aligned.sortedByCoord.out.bam.bai"),
+    threads: int(THREADS.get("samtools_index", 2))
+    log:
+        str(LOG_DIR / "samtools" / "{sample}.index.log"),
+    conda:
+        "envs/samtools1.yaml"
     shell:
         """
-        featureCounts -T 40 -p -t exon \
-        -g gene_id -a {params.ref} \
-        -o {output.counts} \
-        {input.sort_bam}
+        mkdir -p "$(dirname {log:q})"
+        samtools index -@ {threads} {input.bam:q} {output.bai:q} > {log:q} 2>&1
         """
 
-rule getCounts:
+
+rule featurecounts:
     input:
-        counts=bam_DIR+"/{sample}/{sample}_counts.txt"
+        bam=str(ALIGN_DIR / "{sample}" / "{sample}_Aligned.sortedByCoord.out.bam"),
     output:
-        counts_tmp=bam_DIR+"/{sample}/{sample}_counts.id.tmp.txt"
-    conda:"subread"
+        counts=str(ALIGN_DIR / "{sample}" / "{sample}_featureCounts.txt"),
+    threads: int(THREADS.get("featurecounts", 8))
+    params:
+        annotation=config["ref"],
+    log:
+        str(LOG_DIR / "featurecounts" / "{sample}.log"),
+    conda:
+        "envs/subread.yaml"
     shell:
         """
-        cat {input.counts} | cut -f1,7- > {output.counts_tmp}
-        """   
-     
-rule changecolumn:
-    input:
-        counts_tmp=bam_DIR+"/{sample}/{sample}_counts.id.tmp.txt"
-    conda:"R4.4.3"
-    output:
-        counts_id=bam_DIR+"/{sample}/{sample}_counts.id.txt"
-    script:
-        'script/column.R'
+        mkdir -p "$(dirname {log:q})"
+        featureCounts -T {threads} -p -t exon -g gene_id \
+            -a {params.annotation:q} -o {output.counts:q} {input.bam:q} \
+            > {log:q} 2>&1
+        """

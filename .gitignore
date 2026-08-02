@@ -94,3 +94,9 @@ config/my_*.yml
 config/my_*.yaml
 !config/config.yml
 !config/config.template.yml
+
+# Local development and generated test artifacts
+.spec-workflow/
+tests/output/
+tests/fixtures/aligned/
+tests/fixtures/reference/

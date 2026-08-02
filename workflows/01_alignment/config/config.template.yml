@@ -1,85 +1,29 @@
-# Configuration Template for RNA-seq Alignment Workflow
-# Copy this file and modify paths for your project
+# RNA-seq alignment configuration template.
+# Paths may be absolute or relative to the directory where Snakemake is run.
 
-# ============================================================================
-# PROJECT INFORMATION
-# ============================================================================
+samples: config/samples.tsv
+output_dir: /path/to/output/alignment
 
-# Cohort name (used for organizing outputs)
-cohort: YOUR_COHORT_NAME
+# GRCh38 STAR index built with STAR 2.7.7a and GENCODE v34.
+star_index_DIR: /path/to/references/STAR_index
+ref: /path/to/references/gencode.v34.annotation.gtf
 
-# ============================================================================
-# DIRECTORY PATHS
-# ============================================================================
-
-# Root directory for all data
-root_DIR: /path/to/your/data
-
-# Directory containing input FASTQ files
-# Expected naming: {sample}_1.fastq.gz and {sample}_2.fastq.gz
-raw_DIR: /path/to/your/fastq
-
-# Output directory for aligned BAM files
-bam_DIR: /path/to/your/output/aligned
-
-# Working directory for intermediate files
-workdir: /path/to/your/output
-
-# ============================================================================
-# REFERENCE FILES
-# ============================================================================
-
-# STAR genome index directory
-# Build with: STAR --runMode genomeGenerate ...
-star_index_DIR: /path/to/STAR_index
-
-# GTF annotation file (GENCODE v34 recommended)
-ref: /path/to/gencode.v34.annotation.gtf
-
-# Reference genome FASTA file (GRCh38 recommended)
-ref_fa: /path/to/GRCh38.primary_assembly.genome.fa
-
-# ============================================================================
-# SEQUENCING PARAMETERS
-# ============================================================================
-
-# Library strandness (IMPORTANT: check your library prep protocol)
-# Options:
-#   - fr-firststrand: dUTP/NSR/NNSR methods (most common for Illumina TruSeq)
-#   - fr-secondstrand: Ligation-based methods
-#   - fr-unstranded: Unstranded libraries
+# One of: fr-firststrand, fr-secondstrand, fr-unstranded.
 strandness: fr-firststrand
 
-# Maximum read length in your data
-# If variable read length, use the maximum value
-# Check with: samtools stats your.bam | grep "maximum length"
-read_len: 150
+threads:
+  fastp: 8
+  star: 10
+  samtools_sort: 8
+  samtools_index: 2
+  featurecounts: 8
 
-# ============================================================================
-# FASTP QC PARAMETERS
-# ============================================================================
+fastp:
+  min_length: 36
+  qualified_quality_phred: 20
+  unqualified_percent_limit: 40
+  n_base_limit: 5
 
-# Number of threads for fastp
-fastp_threads: 8
-
-# Minimum read length after trimming (reads shorter than this are discarded)
-fastp_min_length: 36
-
-# Minimum base quality score (bases below this threshold are considered low quality)
-fastp_phred: 20
-
-# Maximum percentage of low-quality bases allowed per read (0-100)
-fastp_unqualified_percent_limit: 40
-
-# Maximum number of N bases allowed per read
-fastp_n_base_limit: 5
-
-# ============================================================================
-# NOTES
-# ============================================================================
-
-# 1. Ensure all paths are absolute (not relative)
-# 2. FASTQ files must be gzipped and follow naming convention
-# 3. STAR index must match the STAR version used (2.7.7a recommended)
-# 4. For strandness, use RSeQC infer_experiment.py if unsure
-# 5. Read length: use maximum if variable (e.g., 150 for 100-150bp reads)
+star:
+  out_filter_mismatch_nmax: 15
+  limit_bam_sort_ram: 39050942993

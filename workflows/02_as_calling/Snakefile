@@ -1,75 +1,66 @@
-# Snakefile v.0.1
-# ssh node3
-# micromamba create -c conda-forge -c bioconda -n snakemake snakemake
-# cd /data/home/zyh/project/AS-Pipeline/snakemake/call-workflow/
-# micromamba activate snakemake
-# 在config文件中确定read length
-# snakemake -s Snakefile --dag | dot -Tpdf > dag.pdf
-# export TMPDIR=/data/home/zyh/tmp
-# 重新运行suppa2
-# find /data/data2/IO_RNA/AS/EGA_OAK/AS_output -type f -name '*_event.psi'
-# find /data/data2/IO_RNA/AS/EGA_OAK/AS_output -type f -name '*_event.psi' -delete
-# 先运行这一段更新时间戳: nohup snakemake -s Snakefile --cores 100 --use-conda --rerun-incomplete --touch --retries 3 >EGA_OAK.log 2>&1 &
-# Run with: nohup snakemake -s Snakefile --cores 40 --use-conda --rerun-incomplete --retries 3 --keep-going > EGA_OAK.log 2>&1 &
-# save pid: echo $! > run.EGA_OAK.pid
+# Four-caller alternative-splicing quantification workflow for TCASIA.
 
-
-# Snakefile
+from pathlib import Path
+import sys
 
 from snakemake.utils import min_version
 
-##### set minimum snakemake version #####
 min_version("7.0.0")
-
-
-##### setup report #####
 configfile: "config/config.yml"
 
+LIB_DIR = Path(workflow.basedir).resolve().parent / "lib"
+sys.path.insert(0, str(LIB_DIR))
+from tcasia_config import (
+    load_samples,
+    majiq_strandness,
+    normalize_strandness,
+    require_config,
+    salmon_library_type,
+)
 
-report: "logs/workflow.rst"
+require_config(
+    config,
+    "samples",
+    "output_dir",
+    "bam_dir",
+    "ref",
+    "GFF",
+    "MAJIQ_license",
+    "suppa2_events",
+    "SALMON_INDEX",
+    "read_len",
+    "strandness",
+)
 
+SAMPLE_TABLE = load_samples(config["samples"])
+SAMPLES = list(SAMPLE_TABLE)
+STRANDNESS = normalize_strandness(config["strandness"])
+RMATS_LIBRARY_TYPE = STRANDNESS
+SALMON_LIBRARY_TYPE = salmon_library_type(STRANDNESS)
+MAJIQ_STRANDNESS = majiq_strandness(STRANDNESS)
 
-##### load rules #####
-import os
-import glob
+OUTPUT_DIR = Path(config["output_dir"]).expanduser().resolve()
+BAM_DIR = Path(config["bam_dir"]).expanduser().resolve()
+LOG_DIR = OUTPUT_DIR / "logs"
+THREADS = config.get("threads", {})
+
+SAMPLE_FASTQ_1 = lambda wildcards: SAMPLE_TABLE[wildcards.sample]["fastq_1"]
+SAMPLE_FASTQ_2 = lambda wildcards: SAMPLE_TABLE[wildcards.sample]["fastq_2"]
+SAMPLE_BAM = lambda wildcards: str(
+    BAM_DIR / wildcards.sample / f"{wildcards.sample}_Aligned.sortedByCoord.out.bam"
+)
+
 
 include: "rules/snakefile_majiq"
 include: "rules/snakefile_rmats"
 include: "rules/snakefile_suppa2"
 include: "rules/snakefile_spladder"
 
-# 获取样本列表
-raw_DIR = config["raw_DIR"]
-workdir: config['workdir']
-
-def get_samples():
-    return [os.path.splitext(os.path.basename(x))[0].rsplit('_', 1)[0] for x in glob.glob(f"{raw_DIR}/*_1.fastq.gz")]
-
-samples = get_samples()
-
-
-##### target rules #####
-
-def get_final_output():
-    final_output = expand(
-        "AS_output/{sample}/majiq/{sample}.voila.tsv", 
-        sample=samples
-    ) + expand(
-        "AS_output/{sample}/majiq/modulized/", 
-        sample=samples
-    ) + expand(
-        "AS_output/{sample}/rmats/", 
-        sample=samples
-    ) + expand(
-        "AS_output/{sample}/suppa2/{sample}_event.psi",
-        sample=samples
-    ) + expand(
-        "AS_output/{sample}/spladder/",
-        sample=samples
-    )
-    return final_output
-
 
 rule all:
     input:
-        get_final_output(),
+        expand(str(OUTPUT_DIR / "{sample}" / "majiq" / "{sample}.voila.tsv"), sample=SAMPLES),
+        expand(str(OUTPUT_DIR / "{sample}" / "majiq" / "modulized"), sample=SAMPLES),
+        expand(str(OUTPUT_DIR / "{sample}" / "rmats"), sample=SAMPLES),
+        expand(str(OUTPUT_DIR / "{sample}" / "suppa2" / "{sample}_event.psi"), sample=SAMPLES),
+        expand(str(OUTPUT_DIR / "{sample}" / "spladder"), sample=SAMPLES),

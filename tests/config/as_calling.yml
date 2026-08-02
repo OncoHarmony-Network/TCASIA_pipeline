@@ -1,0 +1,17 @@
+samples: tests/fixtures/samples.tsv
+output_dir: tests/output/as_calling
+bam_dir: tests/fixtures/aligned
+ref: tests/fixtures/reference/annotation.gtf.txt
+GFF: tests/fixtures/reference/annotation.gff3.txt
+MAJIQ_license: tests/fixtures/reference/majiq.license.txt
+suppa2_events: tests/fixtures/reference/events.ioe.txt
+SALMON_INDEX: tests/fixtures/reference/salmon_index
+read_len: 12
+strandness: fr-firststrand
+
+threads:
+  rmats: 1
+  majiq: 1
+  voila: 1
+  salmon: 1
+  spladder: 1

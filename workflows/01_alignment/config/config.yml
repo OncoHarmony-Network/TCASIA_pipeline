@@ -1,37 +1,23 @@
-cohort:
-  PRJNA498500 
+# Copy this file before use and replace all placeholder paths.
+samples: config/samples.tsv
+output_dir: /path/to/output/alignment
+star_index_DIR: /path/to/references/STAR_index
+ref: /path/to/references/gencode.v34.annotation.gtf
+strandness: fr-firststrand
 
-root_DIR:
-  /data/data2/IO_RNA
+threads:
+  fastp: 8
+  star: 10
+  samtools_sort: 8
+  samtools_index: 2
+  featurecounts: 8
 
-raw_DIR:
-  /data/data2/IO_RNA/PRJNA498500/fq
+fastp:
+  min_length: 36
+  qualified_quality_phred: 20
+  unqualified_percent_limit: 40
+  n_base_limit: 5
 
-bam_DIR:
-  /data/data2/IO_RNA/AS/PRJNA498500/aligned
-
-workdir:
-  /data/data2/IO_RNA/AS/PRJNA498500
-  
-star_index_DIR:
-  /data/data2/reference/hg38_ek12/STAR_index_star_2.7.7a
-
-# In case of doubt, please RSeQC infer_experiment result
-strandness:
-  fr-firststrand
-# If the read length is variable, use the maximum value
-read_len:
-  50
-# full path to the reference transcriptome model
-ref:
-  /data/data2/reference/hg38_ek12/gencode.v34.annotation.gtf
-# full path to the reference sequence
-ref_fa:
-  /data/data2/reference/hg38_ek12/GRCh38.primary_assembly.genome.fa
-
-# fastp QC parameters
-fastp_threads: 8
-fastp_min_length: 36
-fastp_phred: 20
-fastp_unqualified_percent_limit: 40
-fastp_n_base_limit: 5
+star:
+  out_filter_mismatch_nmax: 15
+  limit_bam_sort_ram: 39050942993

@@ -1,79 +1,52 @@
-#
-# micromamba create -n rmats -c bioconda -c conda-forge rmats
-# Run with snakemake -s snakefile_rmats --cores 15  --use-conda 
-# snakemake -s rules/snakefile_rmats --dag | dot -Tpdf > dag.pdf
-# rmats需要确定样本的fastq的read数，一般来说，一个队列的read数是相同的，所以只需要确定一个样本就ok
-# 确定read数的方法是：
-# conda acttivate samtools1
-# samtools stats /home/data2/IO_RNA/AS/EGA_IMmotion150/aligned/EGAN00001749284/EGAN00001749284_Aligned.sortedByCoord.out.bam > /home/data2/home/zyh/project/AS_data/test/stats.txt
-# 找到maximum_length
-
-# Snakefile
-
-
-from collections import defaultdict
-import tempfile
-
-
-import os
-import glob
-
-# 获取样本列表
-raw_DIR = config["raw_DIR"]
-bam_DIR = config["bam_DIR"]
-workdir: config['workdir']
-
-def get_samples():
-    return [os.path.splitext(os.path.basename(x))[0].split('_')[0] for x in glob.glob(f"{raw_DIR}/*_1.fastq.gz")]
-
-samples = get_samples()
-
-temp_dir = tempfile.TemporaryDirectory()
-
-rule rmats:
-    input:
-        expand("AS_output/{sample}/rmats/", sample=samples),
+# rMATS is run per sample with statistics disabled to obtain PSI values.
 
 rule rmats_create_input:
     input:
-        bam=lambda wildcards: f"{config['bam_DIR']}/{wildcards.sample}/{wildcards.sample}_Aligned.sortedByCoord.out.bam",
-    log:
-        "logs/rmats_create_input_{sample}.log",
+        bam=SAMPLE_BAM,
     output:
-        txt="rmats/{sample}.txt",
-    run:
-      with open(output.txt, "w") as fou:
-            fou.write(input.bam)
+        txt=str(OUTPUT_DIR / "work" / "rmats" / "{sample}.txt"),
+    log:
+        str(LOG_DIR / "rmats" / "{sample}.input.log"),
+    conda:
+        "../envs/rmats.yaml"
+    shell:
+        """
+        mkdir -p "$(dirname {output.txt:q})" "$(dirname {log:q})"
+        printf '%s\n' {input.bam:q} > {output.txt:q} 2> {log:q}
+        """
+
 
 rule rmats_run:
     input:
-        alt="rmats/{sample}.txt",
+        bam_list=str(OUTPUT_DIR / "work" / "rmats" / "{sample}.txt"),
     output:
-        directory("AS_output/{sample}/rmats/"),
-    conda:
-        "rmats",
-    log:
-        "logs/rmats_run_{sample}.log"
+        results=directory(str(OUTPUT_DIR / "{sample}" / "rmats")),
+    threads: int(THREADS.get("rmats", 10))
     params:
         gtf=config["ref"],
-        lib=config.get("strandness", "fr-unstranded"),
-        read_len=config["read_len"],
-        allow_clipping=config.get("rmats_allow_clipping", "--allow-clipping"),
-        variable_read_length=config.get(
-            "rmats_variable_read_length", "--variable-read-length"
-        ),
-        novel_ss=config.get("rmats_novel_ss", "--novelSS"),
-        extra=config.get("rmats_extra", ""),
-        tmp=os.path.join(temp_dir.name, "{sample}/"),
+        read_len=int(config["read_len"]),
+        library_type=RMATS_LIBRARY_TYPE,
+        cstat=float(config.get("rmats", {}).get("cstat", 0.0001)),
+        tmp=lambda wildcards: str(OUTPUT_DIR / "work" / "rmats" / f"{wildcards.sample}.tmp"),
+        extra=config.get("rmats", {}).get("extra", ""),
+    log:
+        str(LOG_DIR / "rmats" / "{sample}.log"),
+    conda:
+        "../envs/rmats.yaml"
     shell:
-        "rmats.py "
-        "--b1 {input.alt} "
-        "--gtf {params.gtf} "
-        "--readLength {params.read_len} "
-        "--nthread 30 "
-        "--od {output} "
-        "-t paired "
-        "--cstat 0.0001 "
-        "--tmp {params.tmp} "
-        "--variable-read-length "
-
+        """
+        mkdir -p {params.tmp:q} "$(dirname {log:q})"
+        rmats.py \
+            --b1 {input.bam_list:q} \
+            --gtf {params.gtf:q} \
+            --readLength {params.read_len} \
+            --nthread {threads} \
+            --od {output.results:q} \
+            --tmp {params.tmp:q} \
+            --libType {params.library_type} \
+            --cstat {params.cstat} \
+            --statoff \
+            --variable-read-length \
+            -t paired {params.extra} \
+            > {log:q} 2>&1
+        """

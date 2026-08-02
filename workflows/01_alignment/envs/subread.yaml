@@ -1,6 +1,6 @@
-name: tcasia-fastp
+name: tcasia-subread
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - fastp=0.23.4
+  - subread=2.0.1

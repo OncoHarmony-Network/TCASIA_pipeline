@@ -1,41 +1,36 @@
-# rmats需要确定样本的fastq的read (read_len) 数，一般来说，一个队列的read数是相同的，所以只需要确定一个样本就ok
-# 确定read数的方法是：
-# 运行 /data/home/zyh/project/AS-Pipeline/snakemake/call-workflow/scripts/read_length.sh
-# 查看 /data/home/zyh/project/AS_data/test/max_lengths.txt
-# 找到 maximum_length
+# Copy this file before use and replace all placeholder paths.
+samples: config/samples.tsv
+output_dir: /path/to/output/as_calling
+bam_dir: /path/to/output/alignment/aligned
 
-# If the read length is variable, use the maximum value
-read_len:
-  51
+ref: /path/to/references/gencode.v34.annotation.gtf
+GFF: /path/to/references/gencode.v34.annotation.gff3
+MAJIQ_license: /path/to/majiq_license_academic_official.lic
+suppa2_events: /path/to/references/gencode.v34.events.ioe
+SALMON_INDEX: /path/to/references/gencode.v34.transcripts.salmon.index
 
-raw_DIR:
-  /data/data2/IO_RNA/EGA_OAK/fq
+read_len: 150
+strandness: fr-firststrand
 
-bam_DIR:
-  /data/data2/IO_RNA/AS/EGA_OAK/aligned
+threads:
+  rmats: 10
+  majiq: 8
+  voila: 4
+  salmon: 8
+  spladder: 8
 
-workdir:
-  /data/data2/IO_RNA/AS/EGA_OAK
+rmats:
+  cstat: 0.0001
+  extra: ""
 
-MAJIQ_license:
-  /data/home/zyh/project/AS-Pipeline/snakemake/call-workflow/scripts/majiq_license_academic_official.lic
+majiq:
+  genome: hg38
+  minreads: 10
 
-suppa2_events:
-  /data/data2/reference/hg38_ek12/gencode.v34.events.ioe
+suppa2:
+  min_tpm: 1
 
-SALMON_INDEX:
-  /data/data2/reference/hg38_ek12/gencode.v34.transcripts.salmon.index
-  
-
-# In case of doubt, please RSeQC infer_experiment result
-strandness:
-  fr-firststrand
-
-# full path to the reference transcriptome model
-ref:
-  /data/data2/reference/hg38_ek12/gencode.v34.annotation.gtf
-# full path to the reference sequence
-ref_fa:
-  /data/data2/reference/hg38_ek12/GRCh38.primary_assembly.genome.fa
-GFF:
-  /data/data2/reference/hg38_ek12/gencode.v34.annotation.gff3
+spladder:
+  confidence: 3
+  merge_strategy: single
+  event_types: exon_skip,intron_retention,alt_3prime,alt_5prime,mutex_exons
